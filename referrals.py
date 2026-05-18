@@ -43,27 +43,31 @@ def _env_int(name: str, default: int) -> int:
 
 
 def signup_bonus_units() -> int:
-    """Bonus immédiat des deux côtés (parrain + filleul) au signup. Défaut : 1 MRU (peu, juste pour l'effet)."""
+    """Bonus immédiat au signup. Désactivé par défaut (0) — remplacé par
+    les ``free hints`` (10 corrections gratuites en 24h cf. credits_logic).
+    """
     raw = os.getenv("REFERRAL_SIGNUP_BONUS_UNITS")
     if raw is None or str(raw).strip() == "":
-        return 1 * MRU_WALLET_MICRO
-    return _env_int("REFERRAL_SIGNUP_BONUS_UNITS", 1 * MRU_WALLET_MICRO)
+        return 0
+    return _env_int("REFERRAL_SIGNUP_BONUS_UNITS", 0)
 
 
 def paid_topup_bonus_units_referrer() -> int:
-    """Gros bonus au parrain quand le filleul fait sa 1ère recharge. Défaut : 10 MRU."""
+    """Bonus au parrain quand le filleul fait sa 1ère recharge approuvée.
+    Défaut : 2 MRU.
+    """
     raw = os.getenv("REFERRAL_PAID_TOPUP_BONUS_UNITS_REFERRER")
     if raw is None or str(raw).strip() == "":
-        return 10 * MRU_WALLET_MICRO
-    return _env_int("REFERRAL_PAID_TOPUP_BONUS_UNITS_REFERRER", 10 * MRU_WALLET_MICRO)
+        return 2 * MRU_WALLET_MICRO
+    return _env_int("REFERRAL_PAID_TOPUP_BONUS_UNITS_REFERRER", 2 * MRU_WALLET_MICRO)
 
 
 def paid_topup_bonus_units_referred() -> int:
-    """Bonus côté filleul à sa 1ère recharge approuvée. Défaut : 5 MRU."""
+    """Bonus côté filleul à sa 1ère recharge approuvée. Défaut : 2 MRU."""
     raw = os.getenv("REFERRAL_PAID_TOPUP_BONUS_UNITS_REFERRED")
     if raw is None or str(raw).strip() == "":
-        return 5 * MRU_WALLET_MICRO
-    return _env_int("REFERRAL_PAID_TOPUP_BONUS_UNITS_REFERRED", 5 * MRU_WALLET_MICRO)
+        return 2 * MRU_WALLET_MICRO
+    return _env_int("REFERRAL_PAID_TOPUP_BONUS_UNITS_REFERRED", 2 * MRU_WALLET_MICRO)
 
 
 def referrer_max_active_referrals() -> int:

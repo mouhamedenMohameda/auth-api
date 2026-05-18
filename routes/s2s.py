@@ -169,6 +169,68 @@ class CreditBody(BaseModel):
     note: Optional[str] = Field(default=None, max_length=256)
 
 
+# ─── /s2s/free-hint/consume ──────────────────────────────────────────────────
+
+
+class FreeHintConsumeBody(BaseModel):
+    user_id: int
+
+
+class FreeHintConsumeResponse(BaseModel):
+    consumed: bool
+    remaining: int
+    expires_at: Optional[str] = None
+    reason: Optional[str] = None  # "expired" | "exhausted" | None si consumed=True
+
+
+@router.post("/free-hint/consume", response_model=FreeHintConsumeResponse)
+def free_hint_consume(
+    body: FreeHintConsumeBody,
+    db: Session = Depends(get_db),
+    app_id: str = Depends(require_s2s_app),  # noqa: ARG001
+):
+    """Consomme atomiquement un upload gratuit pour ce user, si disponible.
+
+    Retourne ``consumed=False`` si la deadline est dépassée ou si le solde de
+    free hints est nul. Dans ce cas, l'app appelante doit basculer sur le
+    flux MRU classique (``/s2s/wallet/me`` + ``/s2s/wallet/debit``).
+    """
+    u = _user_or_404(db, body.user_id)
+    fh_exp = u.free_hints_expires_at
+    now = utc_now()
+    expired = fh_exp is None or fh_exp < now
+    if expired:
+        # On nettoie le solde résiduel : la deadline a primé.
+        if (u.free_hints_remaining or 0) > 0:
+            u.free_hints_remaining = 0
+            db.add(u)
+            db.commit()
+        return FreeHintConsumeResponse(
+            consumed=False,
+            remaining=0,
+            expires_at=fh_exp.isoformat() if fh_exp else None,
+            reason="expired",
+        )
+    remaining = int(u.free_hints_remaining or 0)
+    if remaining <= 0:
+        return FreeHintConsumeResponse(
+            consumed=False,
+            remaining=0,
+            expires_at=fh_exp.isoformat(),
+            reason="exhausted",
+        )
+    u.free_hints_remaining = remaining - 1
+    db.add(u)
+    db.commit()
+    db.refresh(u)
+    return FreeHintConsumeResponse(
+        consumed=True,
+        remaining=int(u.free_hints_remaining),
+        expires_at=fh_exp.isoformat(),
+        reason=None,
+    )
+
+
 @router.post("/wallet/credit", response_model=DebitResponse)
 def wallet_credit(
     body: CreditBody,

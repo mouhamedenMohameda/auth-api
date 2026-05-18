@@ -43,15 +43,23 @@ def credits_me(
         raise HTTPException(status_code=401, detail="Session invalide.")
     blocked = wallet_block_reason(u)
     bal_units = int(u.credit_balance)
+    # Free hints (uploads gratuits) — l'expiration prime sur le solde.
+    from credits_wallet import utc_now  # local import : éviter cycle hypothétique
+    fh_exp = u.free_hints_expires_at
+    fh_expired = fh_exp is None or fh_exp < utc_now()
+    fh_remaining = 0 if fh_expired else int(u.free_hints_remaining or 0)
     return {
         "feature_enabled": True,
         "credit_balance": bal_units,
         "balance_mru": wallet_units_to_mru_display(bal_units),
         "credits_expire_at": u.credits_expire_at.isoformat() if u.credits_expire_at else None,
-        "can_use_features": blocked is None,
+        "can_use_features": (blocked is None) or (fh_remaining > 0),
         "block_reason": blocked,
         "email": u.email,
         "is_admin": bool(u.is_admin),
+        # Free hints
+        "free_hints_remaining": fh_remaining,
+        "free_hints_expires_at": fh_exp.isoformat() if fh_exp else None,
     }
 
 

@@ -31,7 +31,11 @@ from models import (  # noqa: F401 — charge les tables
 )
 from rate_limit import install_rate_limiter
 from routes import admin_credits, auth, credits, referrals as referrals_routes, s2s
-from schema_migrate import ensure_credit_schema, ensure_referrals_schema
+from schema_migrate import (
+    ensure_credit_schema,
+    ensure_free_hints_schema,
+    ensure_referrals_schema,
+)
 from security import jwt_secret
 
 _env_file = Path(__file__).resolve().parent / ".env"
@@ -50,6 +54,7 @@ async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
     ensure_credit_schema(engine)
     ensure_referrals_schema(engine)
+    ensure_free_hints_schema(engine)
     try:
         sync_designated_admin()
     except Exception as e:

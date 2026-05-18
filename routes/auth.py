@@ -8,7 +8,12 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from credits_logic import registration_bonus_credits, registration_validity_days
+from credits_logic import (
+    registration_bonus_credits,
+    registration_free_hints_count,
+    registration_free_hints_validity_hours,
+    registration_validity_days,
+)
 from credits_wallet import utc_now, wallet_block_reason
 from admin_sync import apply_designated_admin, designated_admin_email_lower, email_matches_designated_admin
 from database import get_db
@@ -124,6 +129,12 @@ def register(request: Request, body: RegisterBody, db: Session = Depends(get_db)
             detail="Les inscriptions sont désactivées lorsque AUTH_REQUIRED=false.",
         )
     bonus = registration_bonus_credits()
+    free_hints = registration_free_hints_count()
+    free_hints_expires = (
+        (utc_now() + timedelta(hours=registration_free_hints_validity_hours()))
+        if free_hints > 0
+        else None
+    )
     user = User(
         email=body.email.strip().lower(),
         password_hash=hash_password(body.password),
@@ -131,6 +142,8 @@ def register(request: Request, body: RegisterBody, db: Session = Depends(get_db)
         whatsapp_phone=body.whatsapp,
         credit_balance=bonus,
         credits_expire_at=(utc_now() + timedelta(days=registration_validity_days())) if bonus > 0 else None,
+        free_hints_remaining=free_hints,
+        free_hints_expires_at=free_hints_expires,
         referral_code=generate_unique_code(db),
     )
     db.add(user)
@@ -201,6 +214,12 @@ def me(
         raise HTTPException(status_code=401, detail="Non authentifié.")
     br = wallet_block_reason(u)
     exp = u.credits_expire_at
+    fh_exp = u.free_hints_expires_at
+    now = utc_now()
+    # Si la deadline est passée, les free hints sont effectivement nuls (même
+    # si la colonne contient encore un solde — c'est l'expiration qui prime).
+    fh_expired = fh_exp is None or fh_exp < now
+    fh_remaining = 0 if fh_expired else int(u.free_hints_remaining or 0)
     return {
         "authenticated": True,
         "user": {
@@ -212,8 +231,11 @@ def me(
             "balance_mru": wallet_units_to_mru_display(int(u.credit_balance)),
             "credits_expire_at": exp.isoformat() if exp else None,
             "credits_blocked_reason": br,
-            "can_use_paid_features": br is None,
+            "can_use_paid_features": (br is None) or (fh_remaining > 0),
             "referral_code": u.referral_code,
+            # Free hints (uploads gratuits)
+            "free_hints_remaining": fh_remaining,
+            "free_hints_expires_at": fh_exp.isoformat() if fh_exp else None,
         },
     }
 

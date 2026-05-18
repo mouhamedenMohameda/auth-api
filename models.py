@@ -74,6 +74,18 @@ class User(Base):
         Boolean, nullable=False, server_default=false(), default=False
     )
 
+    # ─── Free hints (uploads gratuits limités dans le temps) ────────────────
+    # À l'inscription, on alloue N hints gratuits valides pendant H heures.
+    # Chaque appel /api/hint Débloque-moi consomme un free hint (skip MRU)
+    # tant qu'il en reste ET que la deadline n'est pas dépassée. Après quoi
+    # on bascule sur le portefeuille MRU classique.
+    free_hints_remaining: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0", default=0
+    )
+    free_hints_expires_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+
     topup_requests: Mapped[list["CreditTopUpRequest"]] = relationship(
         "CreditTopUpRequest", back_populates="user", cascade="all, delete-orphan"
     )

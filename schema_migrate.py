@@ -53,3 +53,12 @@ def ensure_referrals_schema(engine: Engine) -> None:
     """Ajoute les colonnes referral_code / referred_by_user_id à users."""
     _add_column_safe(engine, "users", "referral_code", "VARCHAR(16) NULL")
     _add_column_safe(engine, "users", "referred_by_user_id", "INTEGER NULL")
+
+
+def ensure_free_hints_schema(engine: Engine) -> None:
+    """Ajoute les colonnes free_hints_remaining / free_hints_expires_at à users.
+
+    Users existants → free_hints_remaining=0 (pas de rétro-activité voulue).
+    """
+    _add_column_safe(engine, "users", "free_hints_remaining", "INTEGER NOT NULL DEFAULT 0")
+    _add_column_safe(engine, "users", "free_hints_expires_at", "TIMESTAMP NULL")
