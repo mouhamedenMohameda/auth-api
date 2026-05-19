@@ -17,6 +17,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from credits_wallet import (
@@ -199,8 +200,7 @@ def free_hint_consume(
     u = _user_or_404(db, body.user_id)
     fh_exp = as_utc_aware(u.free_hints_expires_at)
     now = utc_now()
-    expired = fh_exp is None or fh_exp < now
-    if expired:
+    if fh_exp is None or fh_exp < now:
         # On nettoie le solde résiduel : la deadline a primé.
         if (u.free_hints_remaining or 0) > 0:
             u.free_hints_remaining = 0
@@ -212,17 +212,22 @@ def free_hint_consume(
             expires_at=fh_exp.isoformat() if fh_exp else None,
             reason="expired",
         )
-    remaining = int(u.free_hints_remaining or 0)
-    if remaining <= 0:
+    # UPDATE atomique : on décrémente seulement si le solde est > 0. SQLite
+    # sérialise les écritures, donc deux requêtes parallèles ne pourront pas
+    # toutes deux consommer le dernier free hint (la seconde verra rowcount=0).
+    result = db.execute(
+        update(User)
+        .where(User.id == u.id, User.free_hints_remaining > 0)
+        .values(free_hints_remaining=User.free_hints_remaining - 1)
+    )
+    db.commit()
+    if result.rowcount == 0:
         return FreeHintConsumeResponse(
             consumed=False,
             remaining=0,
             expires_at=fh_exp.isoformat(),
             reason="exhausted",
         )
-    u.free_hints_remaining = remaining - 1
-    db.add(u)
-    db.commit()
     db.refresh(u)
     return FreeHintConsumeResponse(
         consumed=True,
