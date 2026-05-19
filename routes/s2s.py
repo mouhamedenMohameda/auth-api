@@ -13,6 +13,7 @@ Chaque entrée associe un ``app_id`` à un secret partagé.
 from __future__ import annotations
 
 import os
+from datetime import timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -197,6 +198,8 @@ def free_hint_consume(
     """
     u = _user_or_404(db, body.user_id)
     fh_exp = u.free_hints_expires_at
+    if fh_exp is not None and fh_exp.tzinfo is None:
+        fh_exp = fh_exp.replace(tzinfo=timezone.utc)
     now = utc_now()
     expired = fh_exp is None or fh_exp < now
     if expired:
