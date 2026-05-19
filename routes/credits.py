@@ -44,8 +44,8 @@ def credits_me(
     blocked = wallet_block_reason(u)
     bal_units = int(u.credit_balance)
     # Free hints (uploads gratuits) — l'expiration prime sur le solde.
-    from credits_wallet import utc_now  # local import : éviter cycle hypothétique
-    fh_exp = u.free_hints_expires_at
+    from credits_wallet import as_utc_aware, utc_now  # local import : éviter cycle hypothétique
+    fh_exp = as_utc_aware(u.free_hints_expires_at)
     fh_expired = fh_exp is None or fh_exp < utc_now()
     fh_remaining = 0 if fh_expired else int(u.free_hints_remaining or 0)
     return {

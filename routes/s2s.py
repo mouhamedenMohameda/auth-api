@@ -13,7 +13,6 @@ Chaque entrée associe un ``app_id`` à un secret partagé.
 from __future__ import annotations
 
 import os
-from datetime import timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -21,6 +20,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from credits_wallet import (
+    as_utc_aware,
     credit_credits,
     debit_credits,
     utc_now,
@@ -197,9 +197,7 @@ def free_hint_consume(
     flux MRU classique (``/s2s/wallet/me`` + ``/s2s/wallet/debit``).
     """
     u = _user_or_404(db, body.user_id)
-    fh_exp = u.free_hints_expires_at
-    if fh_exp is not None and fh_exp.tzinfo is None:
-        fh_exp = fh_exp.replace(tzinfo=timezone.utc)
+    fh_exp = as_utc_aware(u.free_hints_expires_at)
     now = utc_now()
     expired = fh_exp is None or fh_exp < now
     if expired:

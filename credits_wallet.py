@@ -15,6 +15,14 @@ def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def as_utc_aware(dt: Optional[datetime]) -> Optional[datetime]:
+    """SQLite renvoie des datetimes naïfs ; on les normalise en UTC aware
+    pour permettre les comparaisons avec ``utc_now()``."""
+    if dt is None:
+        return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
 def wallet_block_reason(user: User, now: Optional[datetime] = None) -> Optional[str]:
     """Retourne un message français si le portefeuille bloque l'usage."""
     now = now or utc_now()

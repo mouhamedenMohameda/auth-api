@@ -14,7 +14,7 @@ from credits_logic import (
     registration_free_hints_validity_hours,
     registration_validity_days,
 )
-from credits_wallet import utc_now, wallet_block_reason
+from credits_wallet import as_utc_aware, utc_now, wallet_block_reason
 from admin_sync import apply_designated_admin, designated_admin_email_lower, email_matches_designated_admin
 from database import get_db
 from deps import auth_required, get_current_user_optional
@@ -214,7 +214,7 @@ def me(
         raise HTTPException(status_code=401, detail="Non authentifié.")
     br = wallet_block_reason(u)
     exp = u.credits_expire_at
-    fh_exp = u.free_hints_expires_at
+    fh_exp = as_utc_aware(u.free_hints_expires_at)
     now = utc_now()
     # Si la deadline est passée, les free hints sont effectivement nuls (même
     # si la colonne contient encore un solde — c'est l'expiration qui prime).
