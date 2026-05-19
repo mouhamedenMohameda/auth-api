@@ -73,16 +73,28 @@ else
   exit 3
 fi
 
-# Curl health endpoint (best-effort : si le endpoint n'existe pas, skip)
-HTTP_CODE=$(curl -s -o /tmp/health.body -w '%{http_code}' "$HEALTH_URL" || echo "000")
-if [ "$HTTP_CODE" = "200" ]; then
-  echo "[deploy] Health check OK ($HEALTH_URL → 200)"
-elif [ "$HTTP_CODE" = "404" ] || [ "$HTTP_CODE" = "000" ]; then
-  echo "[deploy] (pas de endpoint $HEALTH_URL, on saute)"
-else
-  echo "[deploy] ⚠️  Health check anormal : HTTP $HTTP_CODE" >&2
-  cat /tmp/health.body 2>/dev/null | head -5
+# Curl health endpoint (best-effort : si le endpoint n'existe pas, skip).
+# On capture le code HTTP sans laisser la concaténation foirer si curl
+# échoue (-w '%{http_code}' renvoie déjà '000' en cas d'erreur).
+set +e
+HTTP_CODE=$(curl -s -o /tmp/health.body -w '%{http_code}' --max-time 5 "$HEALTH_URL" 2>/dev/null)
+CURL_RC=$?
+set -e
+if [ -z "$HTTP_CODE" ] || [ "$CURL_RC" -ne 0 -a "$HTTP_CODE" = "" ]; then
+  HTTP_CODE="000"
 fi
+case "$HTTP_CODE" in
+  200)
+    echo "[deploy] Health check OK ($HEALTH_URL → 200)"
+    ;;
+  404|000)
+    echo "[deploy] (health check sauté — HTTP $HTTP_CODE)"
+    ;;
+  *)
+    echo "[deploy] ⚠️  Health check anormal : HTTP $HTTP_CODE" >&2
+    cat /tmp/health.body 2>/dev/null | head -5
+    ;;
+esac
 
 echo
 echo "✅ Déploiement OK — $(git log -1 --oneline)"
