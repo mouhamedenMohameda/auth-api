@@ -390,3 +390,50 @@ def reject_topup(
 # NB: l'endpoint /admin/transcription-loyalty/reset-all a été retiré de auth-api
 # (spécifique à LectureAI). Si un jour on veut un /admin/wallet-transactions, on
 # l'ajoute ici, basé sur la table WalletTransaction.
+
+
+@router.get("/admin/stats")
+def admin_stats(
+    app_id: str = Query(default="debloquemoi", description="Filtrer par app_id (ex: 'debloquemoi', 'all')"),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin_user),
+):
+    """Métriques financières globales pour l'admin :
+
+    - **total_topups_mru** : somme des recharges approuvées (ce que les users ont payé).
+    - **total_billed_mru** : somme des débits wallet (ce que tu as facturé aux users pour l'IA).
+    - **estimated_provider_cost_mru** : estimation du coût réel fournisseur = total_billed / MARGIN_MULTIPLIER.
+    - **estimated_profit_mru** : bénéfice estimé = total_billed - estimated_provider_cost.
+    """
+    from models import WalletTransaction
+
+    # ── 1. Total recharges approuvées (ce que les users ont payé) ──────────
+    topup_stmt = select(func.coalesce(func.sum(CreditTopUpRequest.credits_granted), 0)).where(
+        CreditTopUpRequest.status == "approved"
+    )
+    total_topups_units: int = int(db.scalar(topup_stmt) or 0)
+    total_topups_mru = wallet_units_to_mru_display(total_topups_units)
+
+    # ── 2. Total débits wallet (ce que tu as facturé pour l'IA) ───────────
+    debit_stmt = select(func.coalesce(func.sum(WalletTransaction.amount_units), 0)).where(
+        WalletTransaction.direction == "debit"
+    )
+    if app_id and app_id != "all":
+        debit_stmt = debit_stmt.where(WalletTransaction.app_id == app_id)
+    total_billed_units: int = int(db.scalar(debit_stmt) or 0)
+    total_billed_mru = wallet_units_to_mru_display(total_billed_units)
+
+    # ── 3. Coût fournisseur estimé et bénéfice ────────────────────────────
+    # Estimation : coût_fournisseur = ce_qui_a_été_facturé / MARGIN_MULTIPLIER
+    # (approximation car chaque opération a sa propre marge, mais suffisant pour le dashboard)
+    estimated_provider_cost_mru = round(total_billed_mru / max(MARGIN_MULTIPLIER, 1.0), 6)
+    estimated_profit_mru = round(total_billed_mru - estimated_provider_cost_mru, 6)
+
+    return {
+        "app_id": app_id,
+        "total_topups_mru": round(total_topups_mru, 4),
+        "total_billed_mru": round(total_billed_mru, 4),
+        "estimated_provider_cost_mru": round(estimated_provider_cost_mru, 4),
+        "estimated_profit_mru": round(estimated_profit_mru, 4),
+        "margin_multiplier": MARGIN_MULTIPLIER,
+    }
