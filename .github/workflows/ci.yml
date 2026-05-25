@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Test d'intégration (auto-suffisant)
+        run: python test_integration.py
+        env:
+          # test_integration.py génère lui-même JWT_SECRET, S2S_API_KEYS,
+          # ADMIN_EMAIL et DATABASE_URL. On fournit juste une clé LLM factice
+          # pour passer la validation d'env au démarrage.
+          OPENAI_API_KEY: ci-dummy-key
+          GROQ_API_KEY: ci-dummy-key
