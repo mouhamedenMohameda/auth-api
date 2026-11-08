@@ -230,6 +230,22 @@ def test_register_login_me(state: dict) -> None:
     r = get("/api/auth/me")
     expect(r, 401, "GET /api/auth/me (sans JWT) → 401")
 
+    # Série du bac : absente au départ, puis C, valeur invalide refusée
+    r = get("/api/auth/me", headers=auth_header(state["tokenA"]))
+    log_test("GET /api/auth/me → bac_filiere null au départ",
+             r.status_code == 200 and "bac_filiere" in r.json()["user"] and r.json()["user"]["bac_filiere"] is None)
+    r = httpx.patch(BASE + "/api/auth/me/profile", json={"bac_filiere": "c"},
+                    headers=auth_header(state["tokenA"]), timeout=10)
+    log_test("PATCH /api/auth/me/profile (c → C)", r.status_code == 200 and r.json().get("bac_filiere") == "C",
+             f"HTTP {r.status_code} — {r.text[:200]}")
+    r = get("/api/auth/me", headers=auth_header(state["tokenA"]))
+    log_test("GET /api/auth/me → bac_filiere = C", r.status_code == 200 and r.json()["user"]["bac_filiere"] == "C")
+    r = httpx.patch(BASE + "/api/auth/me/profile", json={"bac_filiere": "A"},
+                    headers=auth_header(state["tokenA"]), timeout=10)
+    expect(r, 422, "PATCH /api/auth/me/profile (A) → 422")
+    r = httpx.patch(BASE + "/api/auth/me/profile", json={"bac_filiere": "D"}, timeout=10)
+    expect(r, 401, "PATCH /api/auth/me/profile (sans JWT) → 401")
+
 
 def test_credits_me(state: dict) -> None:
     section("Credits : /credits/me")

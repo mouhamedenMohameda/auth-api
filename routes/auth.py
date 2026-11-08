@@ -17,7 +17,7 @@ from credits_logic import (
 from credits_wallet import as_utc_aware, utc_now, wallet_block_reason
 from admin_sync import apply_designated_admin, designated_admin_email_lower, email_matches_designated_admin
 from database import get_db
-from deps import auth_required, get_current_user_optional
+from deps import auth_required, get_current_user_optional, require_user
 from models import User
 from pricing import wallet_units_to_mru_display
 from phone_norm import normalize_nni, normalize_whatsapp
@@ -236,8 +236,42 @@ def me(
             # Free hints (uploads gratuits)
             "free_hints_remaining": fh_remaining,
             "free_hints_expires_at": fh_exp.isoformat() if fh_exp else None,
+            # Série du bac (Débloque-moi) : "C", "D" ou None si pas encore choisie
+            "bac_filiere": u.bac_filiere,
         },
     }
+
+
+BAC_FILIERES = ("C", "D")
+
+
+class ProfileBody(BaseModel):
+    bac_filiere: str
+
+    @field_validator("bac_filiere", mode="before")
+    @classmethod
+    def filiere_norm(cls, v: str) -> str:
+        f = str(v or "").strip().upper()
+        if f not in BAC_FILIERES:
+            raise ValueError("bac_filiere doit être C ou D.")
+        return f
+
+
+@router.patch("/auth/me/profile")
+def update_profile(
+    body: ProfileBody,
+    user: Optional[User] = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    """Met à jour le profil de l'utilisateur connecté (pour l'instant : série du bac)."""
+    if user is None:
+        raise HTTPException(status_code=403, detail="Authentification désactivée.")
+    u = db.get(User, user.id)
+    if not u:
+        raise HTTPException(status_code=401, detail="Non authentifié.")
+    u.bac_filiere = body.bac_filiere
+    db.commit()
+    return {"ok": True, "bac_filiere": u.bac_filiere}
 
 
 @router.post("/auth/reset-password")

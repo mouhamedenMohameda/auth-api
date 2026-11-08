@@ -62,3 +62,8 @@ def ensure_free_hints_schema(engine: Engine) -> None:
     """
     _add_column_safe(engine, "users", "free_hints_remaining", "INTEGER NOT NULL DEFAULT 0")
     _add_column_safe(engine, "users", "free_hints_expires_at", "TIMESTAMP NULL")
+
+
+def ensure_profile_schema(engine: Engine) -> None:
+    """Ajoute la colonne bac_filiere (série du bac : C / D) à users."""
+    _add_column_safe(engine, "users", "bac_filiere", "VARCHAR(4) NULL")

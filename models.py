@@ -86,6 +86,10 @@ class User(Base):
         DateTime(timezone=True), nullable=True, default=None
     )
 
+    # Série du bac de l'élève (Débloque-moi) : "C" ou "D". Demandée une seule
+    # fois côté app, modifiable depuis le profil. NULL = pas encore choisie.
+    bac_filiere: Mapped[Optional[str]] = mapped_column(String(4), nullable=True, default=None)
+
     topup_requests: Mapped[list["CreditTopUpRequest"]] = relationship(
         "CreditTopUpRequest", back_populates="user", cascade="all, delete-orphan"
     )
